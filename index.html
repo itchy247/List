@@ -268,58 +268,7 @@
 
     <!-- Application Logic Script -->
     <script>
-        // Sample Initial State structured identically to reference image
-        const DEFAULT_ITEMS = [
-            {
-                id: '1',
-                title: 'Perdue Harvestland, Organic, Fresh Boneless Chicken...',
-                department: 'Meat & Seafood',
-                badge: 'Perishable',
-                aisle: 'A39',
-                section: '27',
-                price: 6.74,
-                qty: 1,
-                picked: false,
-                image: 'https://images.unsplash.com/photo-1604503468506-a8da13d82791?auto=format&fit=crop&w=300&q=80'
-            },
-            {
-                id: '2',
-                title: 'Pork Center Cut Loin Chops Thin Boneless, 14 Count,...',
-                department: 'Meat & Seafood',
-                badge: 'Perishable',
-                aisle: 'A40',
-                section: '1',
-                price: 5.77,
-                qty: 1,
-                picked: false,
-                image: 'https://images.unsplash.com/photo-1432139555190-58524dae6a55?auto=format&fit=crop&w=300&q=80'
-            },
-            {
-                id: '3',
-                title: 'Marketside Organic Grass-fed Ground Beef 93% Lean/ 7%...',
-                department: 'Meat & Seafood',
-                badge: 'Perishable',
-                aisle: 'A40',
-                section: '9',
-                price: 23.48,
-                qty: 1,
-                picked: false,
-                image: 'https://images.unsplash.com/photo-1588168333986-5078d3ae3976?auto=format&fit=crop&w=300&q=80'
-            },
-            {
-                id: '4',
-                title: 'Marketside Organic Fresh Broccoli Florets, 12 Oz',
-                department: 'Produce',
-                badge: 'Perishable',
-                aisle: 'A1',
-                section: '13',
-                price: 3.97,
-                qty: 1,
-                picked: false,
-                image: 'https://images.unsplash.com/photo-1584270354949-c26b0d5b4a0c?auto=format&fit=crop&w=300&q=80'
-            }
-        ];
-
+       
         // App State
         let items = JSON.parse(localStorage.getItem('picker_items')) || DEFAULT_ITEMS;
         let viewMode = 'aisles'; // 'aisles', 'depts', 'pick'

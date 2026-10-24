@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Walmart Spark Picker List</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Inter Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            sparkBlue: '#0071dc',
+            sparkDarkBlue: '#0053a0',
+            badgeBlue: '#e6f0fa',
+            badgeBlueText: '#004c91',
+            cardBg: '#ffffff',
+            pageBg: '#f3f4f6',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    /* Hide scrollbar for clean app feel */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-100 min-h-screen pb-20 transition-colors duration-200">
+
+  <!-- Main App Container (Mobile viewport optimized) -->
+  <div id="app" class="max-w-md mx-auto min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col shadow-2xl relative">
+
+    <!-- Header Section -->
+    <header class="px-4 pt-5 pb-3 bg-white dark:bg-gray-900 sticky top-0 z-20 border-b border-gray-100 dark:border-gray-800">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-sparkBlue flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+            <i class="fa-solid fa-list-check text-lg"></i>
+          </div>
+          <div>
+            <h1 class="text-xl font-bold text-gray-900 dark:text-white tracking-tight leading-none">Picker List</h1>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Organized by Aisles & Depts</p>
+          </div>
+        </div>
+
+        <!-- Action Icons Row (Matching 671.png header icons) -->
+        <div class="flex items-center space-x-2 text-gray-600 dark:text-gray-300">
+          <button id="themeToggleBtn" title="Toggle Theme" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors">
+            <i class="fa-solid fa-moon text-base dark:hidden"></i>
+            <i class="fa-solid fa-sun text-base hidden dark:inline text-amber-400"></i>
+          </button>
+          <label title="Upload Screenshot AI Scan" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 cursor-pointer transition-colors relative">
+            <i class="fa-solid fa-image text-base"></i>
+            <input type="file" id="imageInput" accept="image/*" class="hidden">
+          </label>
+          <button id="apiKeyBtn" title="Gemini API Key Settings" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors relative">
+            <i class="fa-solid fa-key text-base"></i>
+            <span id="keyIndicator" class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-emerald-500 hidden"></span>
+          </button>
+          <button id="clearRemainingBtn" title="Clear Remaining Unpicked Items" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-amber-600 dark:text-amber-400 transition-colors">
+            <i class="fa-solid fa-broom text-base"></i>
+          </button>
+          <button id="clearAllBtn" title="Clear All Items" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-rose-500 transition-colors">
+            <i class="fa-solid fa-trash-can text-base"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Picking Progress Banner -->
+      <div class="flex items-center justify-between mt-4 px-1">
+        <div class="flex items-center space-x-2">
+          <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Picking Progress:</span>
+          <span id="progressText" class="text-sm font-bold text-sparkBlue">0 / 0 Items</span>
+        </div>
+        <div id="totalPriceText" class="text-sm font-extrabold text-gray-900 dark:text-white">
+          $0.00 Total
+        </div>
+      </div>
+
+      <!-- Mode Pill Navigation -->
+      <div class="grid grid-cols-3 gap-2 mt-4">
+        <button id="tabAisles" onclick="switchTab('aisles')" class="py-2 px-3 rounded-full text-xs font-bold transition-all shadow-sm flex items-center justify-center space-x-1.5 bg-sparkBlue text-white">
+          <i class="fa-solid fa-code-fork text-xs"></i>
+          <span>Aisles</span>
+        </button>
+        <button id="tabDepts" onclick="switchTab('departments')" class="py-2 px-3 rounded-full text-xs font-semibold border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 transition-all flex items-center justify-center space-x-1.5">
+          <i class="fa-solid fa-layer-group text-xs"></i>
+          <span>Departments</span>
+        </button>
+        <button id="tabPickMode" onclick="switchTab('pick')" class="py-2 px-3 rounded-full text-xs font-semibold border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 transition-all flex items-center justify-center space-x-1.5">
+          <i class="fa-solid fa-compass text-xs"></i>
+          <span>Pick Mode</span>
+        </button>
+      </div>
+
+      <!-- Search Input Bar -->
+      <div class="relative mt-3">
+        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+        <input type="text" id="searchInput" placeholder="Search item, aisle, or section..." class="w-full pl-9 pr-8 py-2.5 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-sparkBlue/50 transition-all border border-transparent dark:border-gray-700 placeholder-gray-400">
+        <button id="clearSearchBtn" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+          <i class="fa-solid fa-circle-xmark text-xs"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Scanning / Processing Overlay Indicator -->
+    <div id="processingOverlay" class="hidden px-4 py-3 bg-blue-50 dark:bg-blue-950/50 border-b border-blue-100 dark:border-blue-900 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="animate-spin text-sparkBlue text-base">
+          <i class="fa-solid fa-circle-notch"></i>
+        </div>
+        <div>
+          <p id="processingStatus" class="text-xs font-semibold text-blue-900 dark:text-blue-200">AI Gemini Vision Analyzing Screenshot...</p>
+          <p class="text-[10px] text-blue-600 dark:text-blue-400">Clearing old state and extracting exact details</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main List Container -->
+    <main class="flex-1 px-4 py-4 space-y-6 overflow-y-auto" id="listContainer">
+      <!-- Dynamic list cards render here -->
+    </main>
+
+    <!-- Floating Action Button (+) for manual addition -->
+    <button id="addFabBtn" class="fixed bottom-6 right-6 w-14 h-14 bg-sparkBlue text-white rounded-full shadow-lg shadow-blue-500/40 flex items-center justify-center text-xl active:scale-95 transition-transform z-30">
+      <i class="fa-solid fa-plus"></i>
+    </button>
+
+    <!-- Modal: Add / Edit Item -->
+    <div id="itemModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+      <div class="bg-white dark:bg-gray-900 rounded-2xl p-5 w-full max-w-sm shadow-2xl space-y-4 border border-gray-100 dark:border-gray-800">
+        <div class="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-gray-800">
+          <h3 id="modalTitle" class="text-base font-bold text-gray-900 dark:text-white">Add New Shopping Item</h3>
+          <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+            <i class="fa-solid fa-xmark text-lg"></i>
+          </button>
+        </div>
+
+        <form id="itemForm" class="space-y-3">
+          <input type="hidden" id="editItemId">
+          <div>
+            <label class="block text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1">Product Title</label>
+            <input type="text" id="formTitle" required placeholder="e.g. Perdue Harvestland Organic Fresh Boneless..." class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-lg text-xs font-medium border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sparkBlue">
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1">Department</label>
+              <input type="text" id="formDept" placeholder="e.g. Meat" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-lg text-xs font-medium border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sparkBlue">
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1">Badge Tag</label>
+              <input type="text" id="formTag" placeholder="e.g. Perishable" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-lg text-xs font-medium border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sparkBlue">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1">Aisle</label>
+              <input type="text" id="formAisle" placeholder="e.g. A39" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-lg text-xs font-medium border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sparkBlue">
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1">Section</label>
+              <input type="text" id="formSection" placeholder="e.g. 27" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-lg text-xs font-medium border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sparkBlue">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1">Price ($)</label>
+              <input type="number" step="0.01" id="formPrice" placeholder="6.74" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-lg text-xs font-medium border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sparkBlue">
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1">Quantity</label>
+              <input type="number" id="formQty" value="1" min="1" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-lg text-xs font-medium border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sparkBlue">
+            </div>
+          </div>
+
+          <div class="pt-2 flex space-x-2">
+            <button type="button" onclick="closeModal()" class="flex-1 py-2.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-semibold rounded-xl text-xs hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">Cancel</button>
+            <button type="submit" class="flex-1 py-2.5 bg-sparkBlue text-white font-semibold rounded-xl text-xs hover:bg-blue-600 transition-colors shadow-md shadow-blue-500/20">Save Item</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal: API Key Settings -->
+    <div id="apiKeyModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+      <div class="bg-white dark:bg-gray-900 rounded-2xl p-5 w-full max-w-sm shadow-2xl space-y-4 border border-gray-100 dark:border-gray-800">
+        <div class="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-gray-800">
+          <h3 class="text-base font-bold text-gray-900 dark:text-white">Gemini API Key</h3>
+          <button onclick="closeKeyModal()" class="text-gray-400 hover:text-gray-600">
+            <i class="fa-solid fa-xmark text-lg"></i>
+          </button>
+        </div>
+        <p class="text-xs text-gray-500 dark:text-gray-400">
+          Provide your custom Google Gemini API Key for high-precision OCR screenshot scanning. Leave empty to auto-use free preview runtime.
+        </p>
+        <input type="password" id="customApiKeyInput" placeholder="AIzaSy..." class="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-800 rounded-xl text-xs font-medium border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sparkBlue">
+        <div class="flex space-x-2">
+          <button onclick="saveApiKey()" class="w-full py-2.5 bg-sparkBlue text-white font-bold rounded-xl text-xs hover:bg-blue-600 transition-colors">Save Key</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // --- Application State ---
+    const DEFAULT_ITEMS = [
+      {
+        id: '1',
+        title: 'Perdue Harvestland, Organic, Fresh Boneless Chicken...',
+        department: 'Meat',
+        badge: 'Perishable',
+        aisle: 'A39',
+        section: '27',
+        price: 6.74,
+        qty: 1,
+        picked: false,
+        imageUrl: 'https://images.unsplash.com/photo-1604503468506-a8da13d82791?auto=format&fit=crop&w=200&q=80'
+      },
+      {
+        id: '2',
+        title: 'Pork Center Cut Loin Chops Thin Boneless, 14 Count,...',
+        department: 'Meat',
+        badge: 'Perishable',
+        aisle: 'A40',
+        section: '1',
+        price: 5.77,
+        qty: 1,
+        picked: false,
+        imageUrl: 'https://images.unsplash.com/photo-1432139555190-58524dae6a55?auto=format&fit=crop&w=200&q=80'
+      },
+      {
+        id: '3',
+        title: 'Marketside Organic Grass-fed Ground Beef 93% Lean/ 7%...',
+        department: 'Meat',
+        badge: 'Perishable',
+        aisle: 'A39',
+        section: '9',
+        price: 23.45,
+        qty: 1,
+        picked: false,
+        imageUrl: 'https://images.unsplash.com/photo-1588168333986-5078d3ae3976?auto=format&fit=crop&w=200&q=80'
+      },
+      {
+        id: '4',
+        title: 'Fresh Gala Apples, 3 lb Bag',
+        department: 'Produce',
+        badge: 'Perishable',
+        aisle: 'A12',
+        section: '4',
+        price: 4.00,
+        qty: 1,
+        picked: false,
+        imageUrl: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?auto=format&fit=crop&w=200&q=80'
+      }
+    ];
+
+    let items = [];
+    let currentTab = 'aisles'; // 'aisles', 'departments', 'pick'
+    let searchQuery = '';
+
+    // Standard high quality placeholder image mapping for categories
+    const PRODUCT_IMAGE_FALLBACKS = {
+      meat: 'https://images.unsplash.com/photo-1604503468506-a8da13d82791?auto=format&fit=crop&w=200&q=80',
+      produce: 'https://images.unsplash.com/photo-1610832958506-aa56368176cf?auto=format&fit=crop&w=200&q=80',
+      bakery: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=200&q=80',
+      dairy: 'https://images.unsplash.com/photo-1628088062854-d1870b4553da?auto=format&fit=crop&w=200&q=80',
+      frozen: 'https://images.unsplash.com/photo-1563198804-b13d42a58e3b?auto=format&fit=crop&w=200&q=80',
+      default: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=200&q=80'
+    };
+
+    // --- DOM Elements ---
+    const listContainer = document.getElementById('listContainer');
+    const progressText = document.getElementById('progressText');
+    const totalPriceText = document.getElementById('totalPriceText');
+    const searchInput = document.getElementById('searchInput');
+    const clearSearchBtn = document.getElementById('clearSearchBtn');
+    const processingOverlay = document.getElementById('processingOverlay');
+    const processingStatus = document.getElementById('processingStatus');
+    const imageInput = document.getElementById('imageInput');
+
+    // --- Initialization ---
+    window.addEventListener('DOMContentLoaded', () => {
+      loadSavedState();
+      setupEventListeners();
+      render();
+    });
+
+    function loadSavedState() {
+      const saved = localStorage.getItem('spark_picker_items');
+      if (saved) {
+        try {
+          items = JSON.parse(saved);
+        } catch(e) {
+          items = [...DEFAULT_ITEMS];
+        }
+      } else {
+        items = [...DEFAULT_ITEMS];
+      }
+
+      const savedKey = localStorage.getItem('spark_gemini_key');
+      if (savedKey) {
+        document.getElementById('customApiKeyInput').value = savedKey;
+        document.getElementById('keyIndicator').classList.remove('hidden');
+      }
+    }
+
+    function saveState() {
+      localStorage.setItem('spark_picker_items', JSON.stringify(items));
+    }
+
+    // --- Event Listeners ---
+    function setupEventListeners() {
+      // Search
+      searchInput.addEventListener('input', (e) => {
+        searchQuery = e.target.value.toLowerCase().trim();
+        clearSearchBtn.classList.toggle('hidden', searchQuery === '');
+        render();
+      });
+
+      clearSearchBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        searchQuery = '';
+        clearSearchBtn.classList.add('hidden');
+        render();
+      });
+
+      // Clear All Action
+      document.getElementById('clearAllBtn').addEventListener('click', () => {
+        if (confirm('Clear all items from your picker list?')) {
+          items = [];
+          saveState();
+          render();
+        }
+      });
+
+      // Clear Remaining (Unpicked) Action
+      document.getElementById('clearRemainingBtn').addEventListener('click', () => {
+        if (confirm('Clear remaining unpicked items from the list?')) {
+          items = items.filter(item => item.picked);
+          saveState();
+          render();
+        }
+      });
+
+      // Dark Mode Toggle
+      document.getElementById('themeToggleBtn').addEventListener('click', () => {
+        document.documentElement.classList.toggle('dark');
+      });
+
+      // Add Item FAB
+      document.getElementById('addFabBtn').addEventListener('click', () => {
+        openModal();
+      });
+
+      // Form Submit
+      document.getElementById('itemForm').addEventListener('submit', handleFormSubmit);
+
+      // File Input for Image Upload Scanning
+      imageInput.addEventListener('change', handleImageUpload);
+
+      // API Key Modal
+      document.getElementById('apiKeyBtn').addEventListener('click', () => {
+        document.getElementById('apiKeyModal').classList.remove('hidden');
+      });
+    }
+
+    // --- Tab Switcher ---
+    function switchTab(tab) {
+      currentTab = tab;
+      
+      const btnAisles = document.getElementById('tabAisles');
+      const btnDepts = document.getElementById('tabDepts');
+      const btnPick = document.getElementById('tabPickMode');
+
+      [btnAisles, btnDepts, btnPick].forEach(btn => {
+        btn.className = "py-2 px-3 rounded-full text-xs font-semibold border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 transition-all flex items-center justify-center space-x-1.5";
+      });
+
+      if (tab === 'aisles') {
+        btnAisles.className = "py-2 px-3 rounded-full text-xs font-bold transition-all shadow-sm flex items-center justify-center space-x-1.5 bg-sparkBlue text-white";
+      } else if (tab === 'departments') {
+        btnDepts.className = "py-2 px-3 rounded-full text-xs font-bold transition-all shadow-sm flex items-center justify-center space-x-1.5 bg-sparkBlue text-white";
+      } else if (tab === 'pick') {
+        btnPick.className = "py-2 px-3 rounded-full text-xs font-bold transition-all shadow-sm flex items-center justify-center space-x-1.5 bg-sparkBlue text-white";
+      }
+
+      render();
+    }
+
+    // --- Gemini Vision API Integration (Parsing Screenshots) ---
+    async function handleImageUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      // 1. MANDATORY REQUIREMENT: Clear all existing items and reset input state
+      items = [];
+      saveState();
+      render();
+
+      // Show processing overlay
+      processingOverlay.classList.remove('hidden');
+      processingStatus.textContent = 'Gemini AI Vision Analyzing Image...';
+
+      try {
+        const base64Data = await fileToBase64(file);
+        const apiKey = localStorage.getItem('spark_gemini_key') || "";
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image:generateContent?key=${apiKey}`;
+
+        const systemPrompt = `You are an expert Walmart Spark Picker OCR data extractor. 
+Extract every single item shown in the uploaded screenshot. 
+Output ONLY valid JSON structured as an array of objects with the exact schema:
+[
+  {
+    "title": "exact title of item",
+    "department": "Meat" or "Produce" or "Grocery" or "Bakery" etc,
+    "badge": "Perishable" or "Dry Grocery" or "Health",
+    "aisle": "A39" (or empty string if not found),
+    "section": "27" (or empty string if not found),
+    "price": 6.74,
+    "qty": 1
+  }
+]
+Do not include markdown formatting or backticks around JSON output if possible, just raw JSON.`;
+
+        const payload = {
+          contents: [
+            {
+              role: "user",
+              parts: [
+                { text: systemPrompt },
+                {
+                  inlineData: {
+                    mimeType: file.type || "image/jpeg",
+                    data: base64Data
+                  }
+                }
+              ]
+            }
+          ]
+        };
+
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          throw new Error(`Vision API response error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+        // Parse extracted JSON
+        const cleanedJsonText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+        const extractedItems = JSON.parse(cleanedJsonText);
+
+        if (Array.isArray(extractedItems) && extractedItems.length > 0) {
+          items = extractedItems.map((item, idx) => ({
+            id: Date.now().toString() + idx,
+            title: item.title || 'Scanned Walmart Item',
+            department: item.department || 'Meat',
+            badge: item.badge || 'Perishable',
+            aisle: item.aisle || 'A1',
+            section: item.section || '1',
+            price: typeof item.price === 'number' ? item.price : parseFloat(item.price) || 0,
+            qty: typeof item.qty === 'number' ? item.qty : parseInt(item.qty) || 1,
+            picked: false,
+            imageUrl: getFallbackImageUrl(item.department || item.title)
+          }));
+          saveState();
+        } else {
+          alert('No items could be recognized from the image. Added a placeholder.');
+        }
+
+      } catch (err) {
+        console.error('Gemini OCR Error:', err);
+        alert('Failed to process screenshot with AI. Initializing empty list for manual entry.');
+      } finally {
+        processingOverlay.classList.add('hidden');
+        imageInput.value = ''; // Reset input element
+        render();
+      }
+    }
+
+    function fileToBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+          const base64String = reader.result.split(',')[1];
+          resolve(base64String);
+        };
+        reader.onerror = error => reject(error);
+      });
+    }
+
+    function getFallbackImageUrl(categoryOrTitle) {
+      const str = categoryOrTitle.toLowerCase();
+      if (str.includes('chicken') || str.includes('beef') || str.includes('pork') || str.includes('meat')) {
+        return PRODUCT_IMAGE_FALLBACKS.meat;
+      }
+      if (str.includes('apple') || str.includes('banana') || str.includes('produce') || str.includes('fruit')) {
+        return PRODUCT_IMAGE_FALLBACKS.produce;
+      }
+      if (str.includes('bread') || str.includes('bakery')) {
+        return PRODUCT_IMAGE_FALLBACKS.bakery;
+      }
+      if (str.includes('milk') || str.includes('cheese') || str.includes('dairy')) {
+        return PRODUCT_IMAGE_FALLBACKS.dairy;
+      }
+      return PRODUCT_IMAGE_FALLBACKS.default;
+    }
+
+    // --- Render Engine ---
+    function render() {
+      // 1. Calculate Summary Stats
+      const totalCount = items.length;
+      const pickedCount = items.filter(i => i.picked).length;
+      const totalPrice = items.reduce((sum, item) => sum + (item.price * item.qty), 0);
+
+      progressText.textContent = `${pickedCount} / ${totalCount} Items`;
+      totalPriceText.textContent = `$${totalPrice.toFixed(2)} Total`;
+
+      // 2. Filter items based on search query
+      let filtered = items.filter(item => {
+        if (!searchQuery) return true;
+        return (
+          item.title.toLowerCase().includes(searchQuery) ||
+          item.department.toLowerCase().includes(searchQuery) ||
+          item.aisle.toLowerCase().includes(searchQuery) ||
+          item.section.toLowerCase().includes(searchQuery)
+        );
+      });
+
+      listContainer.innerHTML = '';
+
+      if (filtered.length === 0) {
+        listContainer.innerHTML = `
+          <div class="text-center py-16 px-4">
+            <div class="w-16 h-16 mx-auto mb-3 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400">
+              <i class="fa-solid fa-basket-shopping text-2xl"></i>
+            </div>
+            <h3 class="text-sm font-bold text-gray-700 dark:text-gray-300">No Items Found</h3>
+            <p class="text-xs text-gray-400 mt-1">Upload a Walmart Spark screenshot or tap '+' to add items.</p>
+          </div>
+        `;
+        return;
+      }
+
+      // 3. Group Items by selected Tab Mode
+      let groups = {};
+
+      if (currentTab === 'aisles') {
+        filtered.forEach(item => {
+          const groupName = item.department || 'Meat';
+          if (!groups[groupName]) groups[groupName] = [];
+          groups[groupName].push(item);
+        });
+      } else if (currentTab === 'departments') {
+        filtered.forEach(item => {
+          const groupName = item.department || 'General';
+          if (!groups[groupName]) groups[groupName] = [];
+          groups[groupName].push(item);
+        });
+      } else { // Pick Mode (Unpicked first, then Picked)
+        groups['To Pick'] = filtered.filter(i => !i.picked);
+        groups['Completed'] = filtered.filter(i => i.picked);
+      }
+
+      // 4. Render Group Sections & Cards
+      Object.keys(groups).forEach(groupTitle => {
+        const groupItems = groups[groupTitle];
+        if (groupItems.length === 0) return;
+
+        const sectionEl = document.createElement('div');
+        sectionEl.className = 'space-y-3';
+
+        // Department Section Header (Exact bold match from 671.png e.g. "Meat")
+        const headerEl = document.createElement('h2');
+        headerEl.className = 'text-lg font-bold text-gray-900 dark:text-white tracking-tight px-0.5';
+        headerEl.textContent = groupTitle;
+        sectionEl.appendChild(headerEl);
+
+        const cardStack = document.createElement('div');
+        cardStack.className = 'space-y-3';
+
+        groupItems.forEach(item => {
+          cardStack.appendChild(createItemCard(item));
+        });
+
+        sectionEl.appendChild(cardStack);
+        listContainer.appendChild(sectionEl);
+      });
+    }
+
+    // --- Create Individual Item Card (Matching 671.png layout) ---
+    function createItemCard(item) {
+      const card = document.createElement('div');
+      card.className = `bg-white dark:bg-gray-900 rounded-2xl p-3.5 border border-gray-100 dark:border-gray-800 shadow-sm flex items-start space-x-3 relative transition-all ${
+        item.picked ? 'opacity-50 grayscale' : ''
+      }`;
+
+      // Left Image Thumbnail
+      const imageContainer = document.createElement('div');
+      imageContainer.className = 'w-20 h-20 rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800 flex-shrink-0 cursor-pointer border border-gray-100 dark:border-gray-800';
+      imageContainer.onclick = () => togglePickStatus(item.id);
+
+      const img = document.createElement('img');
+      img.src = item.imageUrl || PRODUCT_IMAGE_FALLBACKS.default;
+      img.alt = item.title;
+      img.className = 'w-full h-full object-cover';
+      img.onerror = () => { img.src = PRODUCT_IMAGE_FALLBACKS.default; };
+      imageContainer.appendChild(img);
+
+      // Main Content Center Column
+      const content = document.createElement('div');
+      content.className = 'flex-1 min-w-0 pr-6 cursor-pointer';
+      content.onclick = () => togglePickStatus(item.id);
+
+      // Top Tag Badge (e.g. "Perishable")
+      const badge = document.createElement('span');
+      badge.className = 'inline-block text-[10px] font-semibold px-2 py-0.5 rounded-md bg-badgeBlue text-badgeBlueText dark:bg-blue-900/40 dark:text-blue-300 mb-1';
+      badge.textContent = item.badge || 'Perishable';
+
+      // Product Title
+      const title = document.createElement('h3');
+      title.className = `text-xs font-bold text-gray-900 dark:text-white leading-snug line-clamp-2 ${
+        item.picked ? 'line-through text-gray-400' : ''
+      }`;
+      title.textContent = item.title;
+
+      // Location (Aisle / Section)
+      const location = document.createElement('p');
+      location.className = 'text-xs text-gray-500 dark:text-gray-400 mt-1 font-medium';
+      location.innerHTML = `Aisle <span class="font-bold text-gray-800 dark:text-gray-200">${item.aisle || 'A39'}</span> &nbsp;|&nbsp; Section <span class="font-bold text-gray-800 dark:text-gray-200">${item.section || '27'}</span>`;
+
+      // Price & Qty Row
+      const footer = document.createElement('div');
+      footer.className = 'flex items-center justify-between mt-2.5';
+
+      const price = document.createElement('span');
+      price.className = 'text-sm font-extrabold text-gray-900 dark:text-white';
+      price.textContent = `$${item.price.toFixed(2)}`;
+
+      const qty = document.createElement('span');
+      qty.className = 'text-xs text-gray-500 dark:text-gray-400 font-medium';
+      qty.innerHTML = `qty <span class="font-bold text-gray-900 dark:text-white">${item.qty}</span>`;
+
+      footer.appendChild(price);
+      footer.appendChild(qty);
+
+      content.appendChild(badge);
+      content.appendChild(title);
+      content.appendChild(location);
+      content.appendChild(footer);
+
+      // Right Action Strip (Pencil Edit & Delete X)
+      const actions = document.createElement('div');
+      actions.className = 'absolute right-2.5 top-2.5 bottom-2.5 flex flex-col justify-between items-center text-gray-300 dark:text-gray-600';
+
+      const editBtn = document.createElement('button');
+      editBtn.className = 'p-1 hover:text-sparkBlue transition-colors text-xs';
+      editBtn.innerHTML = '<i class="fa-solid fa-pen"></i>';
+      editBtn.onclick = (e) => {
+        e.stopPropagation();
+        openModal(item);
+      };
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'p-1 hover:text-rose-500 transition-colors text-xs';
+      deleteBtn.innerHTML = '<i class="fa-solid fa-xmark text-sm"></i>';
+      deleteBtn.onclick = (e) => {
+        e.stopPropagation();
+        deleteItem(item.id);
+      };
+
+      actions.appendChild(editBtn);
+      actions.appendChild(deleteBtn);
+
+      card.appendChild(imageContainer);
+      card.appendChild(content);
+      card.appendChild(actions);
+
+      return card;
+    }
+
+    // --- State Handlers ---
+    function togglePickStatus(id) {
+      items = items.map(item => {
+        if (item.id === id) {
+          return { ...item, picked: !item.picked };
+        }
+        return item;
+      });
+      saveState();
+      render();
+    }
+
+    function deleteItem(id) {
+      items = items.filter(item => item.id !== id);
+      saveState();
+      render();
+    }
+
+    // --- Modal Management ---
+    function openModal(item = null) {
+      const modal = document.getElementById('itemModal');
+      const title = document.getElementById('modalTitle');
+      const editId = document.getElementById('editItemId');
+
+      if (item) {
+        title.textContent = 'Edit Item';
+        editId.value = item.id;
+        document.getElementById('formTitle').value = item.title;
+        document.getElementById('formDept').value = item.department;
+        document.getElementById('formTag').value = item.badge;
+        document.getElementById('formAisle').value = item.aisle;
+        document.getElementById('formSection').value = item.section;
+        document.getElementById('formPrice').value = item.price;
+        document.getElementById('formQty').value = item.qty;
+      } else {
+        title.textContent = 'Add New Item';
+        editId.value = '';
+        document.getElementById('itemForm').reset();
+      }
+
+      modal.classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('itemModal').classList.add('hidden');
+    }
+
+    function handleFormSubmit(e) {
+      e.preventDefault();
+      const editId = document.getElementById('editItemId').value;
+
+      const titleVal = document.getElementById('formTitle').value;
+      const deptVal = document.getElementById('formDept').value || 'Meat';
+      const tagVal = document.getElementById('formTag').value || 'Perishable';
+      const aisleVal = document.getElementById('formAisle').value || 'A1';
+      const sectionVal = document.getElementById('formSection').value || '1';
+      const priceVal = parseFloat(document.getElementById('formPrice').value) || 0.00;
+      const qtyVal = parseInt(document.getElementById('formQty').value) || 1;
+
+      if (editId) {
+        items = items.map(i => i.id === editId ? {
+          ...i,
+          title: titleVal,
+          department: deptVal,
+          badge: tagVal,
+          aisle: aisleVal,
+          section: sectionVal,
+          price: priceVal,
+          qty: qtyVal
+        } : i);
+      } else {
+        items.push({
+          id: Date.now().toString(),
+          title: titleVal,
+          department: deptVal,
+          badge: tagVal,
+          aisle: aisleVal,
+          section: sectionVal,
+          price: priceVal,
+          qty: qtyVal,
+          picked: false,
+          imageUrl: getFallbackImageUrl(deptVal)
+        });
+      }
+
+      saveState();
+      closeModal();
+      render();
+    }
+
+    function closeKeyModal() {
+      document.getElementById('apiKeyModal').classList.add('hidden');
+    }
+
+    function saveApiKey() {
+      const key = document.getElementById('customApiKeyInput').value.trim();
+      if (key) {
+        localStorage.setItem('spark_gemini_key', key);
+        document.getElementById('keyIndicator').classList.remove('hidden');
+      } else {
+        localStorage.removeItem('spark_gemini_key');
+        document.getElementById('keyIndicator').classList.add('hidden');
+      }
+      closeKeyModal();
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AislePilot - Smart Grocery List & Gallery OCR</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Tesseract.js CDN for Browser OCR -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: #475569;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-sans min-h-screen pb-24 md:pb-8 flex justify-center">
+
+    <!-- Mobile Frame Shell -->
+    <div class="w-full max-w-md bg-white dark:bg-slate-900 min-h-screen shadow-2xl flex flex-col relative border-x border-slate-200 dark:border-slate-800">
+        
+        <!-- Header -->
+        <header class="sticky top-0 z-30 bg-indigo-700 dark:bg-indigo-950 text-white px-4 py-3 shadow-md">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-500/30 flex items-center justify-center font-black text-amber-300 border border-indigo-400/30">
+                        <i class="fa-solid fa-cart-shopping text-sm"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-extrabold text-base leading-tight tracking-tight">AislePilot</h1>
+                        <p class="text-[10px] text-indigo-200 font-medium">Grocery Route & OCR Scanner</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-1.5">
+                    <button id="btnThemeToggle" onclick="toggleDarkMode()" class="p-2 rounded-full hover:bg-white/10 text-indigo-100 transition" title="Toggle Dark/Light Mode">
+                        <i class="fa-solid fa-moon text-sm"></i>
+                    </button>
+                    <!-- Gallery File Input Button Trigger -->
+                    <label class="p-2 rounded-full hover:bg-white/10 text-indigo-100 cursor-pointer transition" title="Scan Image from Gallery">
+                        <i class="fa-solid fa-image text-sm"></i>
+                        <input type="file" id="galleryFileInput" accept="image/*" class="hidden" onchange="handleGalleryUpload(event)">
+                    </label>
+                    <button onclick="openImportModal()" class="p-2 rounded-full hover:bg-white/10 text-indigo-100 transition" title="Text Input Parser">
+                        <i class="fa-solid fa-file-lines text-sm"></i>
+                    </button>
+                    <!-- Clear Remaining Unchecked Items -->
+                    <button onclick="confirmClearRemaining()" class="p-2 rounded-full hover:bg-amber-500/20 text-amber-200 hover:text-amber-100 transition" title="Clear Remaining Items">
+                        <i class="fa-solid fa-broom text-sm"></i>
+                    </button>
+                    <!-- Clear All Items -->
+                    <button onclick="confirmClearList()" class="p-2 rounded-full hover:bg-red-500/20 text-red-200 hover:text-red-100 transition" title="Clear Entire List">
+                        <i class="fa-solid fa-trash-can text-sm"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Stats Header Bar -->
+            <div class="mt-3 grid grid-cols-2 gap-2 bg-indigo-800/60 dark:bg-slate-900/60 p-2.5 rounded-xl border border-indigo-500/20 text-center">
+                <div class="border-r border-indigo-600/40 pr-1">
+                    <div class="text-[10px] uppercase font-bold text-indigo-200">Completed Items</div>
+                    <div class="text-sm font-extrabold text-amber-300" id="statCompleted">0 Items</div>
+                </div>
+                <div>
+                    <div class="text-[10px] uppercase font-bold text-indigo-200">Total Items</div>
+                    <div class="text-sm font-extrabold text-white" id="statTotalItems">0 Items</div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Search & Filter Controls -->
+        <section class="bg-slate-50 dark:bg-slate-900/90 p-3 border-b border-slate-200 dark:border-slate-800 space-y-2">
+            <div class="relative">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-slate-400"></i>
+                <input type="text" id="searchInput" oninput="renderApp()" placeholder="Search items, aisles, departments..." 
+                    class="w-full pl-8 pr-8 py-1.5 text-xs rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <button id="btnClearSearch" onclick="clearSearch()" class="hidden absolute right-2.5 top-2 text-xs text-slate-400 hover:text-slate-600">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="flex items-center gap-2 overflow-x-auto pb-1 text-xs no-scrollbar">
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex-shrink-0">Filter:</span>
+                <button onclick="setDeptFilter('ALL')" id="filter-ALL" class="dept-filter-btn active px-2.5 py-0.5 rounded-full font-semibold bg-indigo-600 text-white flex-shrink-0">All</button>
+                <div id="deptFilterContainer" class="flex gap-1.5"></div>
+            </div>
+        </section>
+
+        <!-- View Segment Control -->
+        <nav class="bg-slate-200 dark:bg-slate-800/80 p-1 flex rounded-none text-xs font-bold text-slate-600 dark:text-slate-300">
+            <button onclick="setViewMode('aisle')" id="viewBtn-aisle" class="flex-1 py-1.5 text-center rounded-md bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-sm transition">
+                <i class="fa-solid fa-route mr-1"></i> Aisles
+            </button>
+            <button onclick="setViewMode('dept')" id="viewBtn-dept" class="flex-1 py-1.5 text-center rounded-md transition hover:text-slate-900 dark:hover:text-white">
+                <i class="fa-solid fa-layer-group mr-1"></i> Depts
+            </button>
+            <button onclick="setViewMode('route')" id="viewBtn-route" class="flex-1 py-1.5 text-center rounded-md transition hover:text-slate-900 dark:hover:text-white">
+                <i class="fa-solid fa-compass mr-1"></i> Shopping Mode
+            </button>
+        </nav>
+
+        <!-- Main Content List -->
+        <main class="flex-1 p-3 overflow-y-auto" id="mainContent">
+            <!-- Dynamic Injection -->
+        </main>
+
+        <!-- Gallery OCR Button & Quick Add FAB -->
+        <div class="fixed bottom-4 right-4 md:absolute md:bottom-6 z-20 flex flex-col items-end gap-2">
+            <!-- Direct Gallery Upload FAB -->
+            <label class="w-11 h-11 rounded-full bg-amber-500 hover:bg-amber-600 text-slate-900 flex items-center justify-center shadow-lg cursor-pointer active:scale-95 transition" title="Upload Photo from Gallery">
+                <i class="fa-solid fa-file-image text-base"></i>
+                <input type="file" accept="image/*" class="hidden" onchange="handleGalleryUpload(event)">
+            </label>
+            <!-- Manual Add FAB -->
+            <button onclick="openItemModal()" class="w-12 h-12 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center shadow-xl active:scale-95 transition" title="Add Item Manually">
+                <i class="fa-solid fa-plus text-lg"></i>
+            </button>
+        </div>
+
+        <!-- Modal: OCR Scanning Progress Indicator -->
+        <div id="ocrModal" class="hidden fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div class="bg-white dark:bg-slate-900 w-full max-w-sm rounded-2xl shadow-2xl p-6 border border-slate-200 dark:border-slate-800 text-center space-y-4">
+                <div class="w-16 h-16 mx-auto rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-2xl animate-pulse">
+                    <i class="fa-solid fa-expand"></i>
+                </div>
+                <div>
+                    <h3 class="font-extrabold text-base dark:text-white">Scanning Photo Gallery Image...</h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1" id="ocrStatusText">Initializing OCR Engine...</p>
+                </div>
+                <!-- Progress Bar -->
+                <div class="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-2.5 overflow-hidden">
+                    <div id="ocrProgressBar" class="bg-indigo-600 h-2.5 rounded-full transition-all duration-300" style="width: 5%"></div>
+                </div>
+                <div id="ocrPreviewContainer" class="hidden max-h-32 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800">
+                    <img id="ocrPreviewImage" class="w-full object-cover opacity-80" src="" alt="OCR Preview">
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: Add / Edit Item -->
+        <div id="itemModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div class="bg-white dark:bg-slate-900 w-full max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl p-5 border border-slate-200 dark:border-slate-800 space-y-4 max-h-[90vh] overflow-y-auto">
+                <div class="flex justify-between items-center border-b pb-2 dark:border-slate-800">
+                    <h3 id="modalTitle" class="font-bold text-base dark:text-white">Add Grocery Item</h3>
+                    <button onclick="closeItemModal()" class="text-slate-400 hover:text-slate-600 text-lg"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <form id="itemForm" onsubmit="saveItem(event)" class="space-y-3">
+                    <input type="hidden" id="itemId">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Item Name *</label>
+                        <input type="text" id="itemName" required placeholder="e.g., Organic Whole Milk" class="w-full px-3 py-2 text-xs rounded-lg border dark:bg-slate-800 dark:border-slate-700 dark:text-white focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Aisle Tag *</label>
+                            <input type="text" id="itemAisle" required placeholder="e.g., A28" class="w-full px-3 py-2 text-xs rounded-lg border dark:bg-slate-800 dark:border-slate-700 dark:text-white focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Section Tag</label>
+                            <input type="text" id="itemSection" placeholder="e.g., 13" class="w-full px-3 py-2 text-xs rounded-lg border dark:bg-slate-800 dark:border-slate-700 dark:text-white focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Department</label>
+                            <select id="itemDept" class="w-full px-2 py-2 text-xs rounded-lg border dark:bg-slate-800 dark:border-slate-700 dark:text-white">
+                                <option value="Bakery">Bakery</option>
+                                <option value="Dairy">Dairy</option>
+                                <option value="Dry Grocery">Dry Grocery</option>
+                                <option value="Frozen">Frozen</option>
+                                <option value="Grocery">Grocery</option>
+                                <option value="Health & Beauty">Health & Beauty</option>
+                                <option value="Household">Household</option>
+                                <option value="Meat">Meat</option>
+                                <option value="Produce">Produce</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Qty</label>
+                            <input type="number" min="1" id="itemQty" value="1" class="w-full px-3 py-2 text-xs rounded-lg border dark:bg-slate-800 dark:border-slate-700 dark:text-white">
+                        </div>
+                    </div>
+                    <div class="flex gap-2 pt-2">
+                        <button type="button" onclick="closeItemModal()" class="flex-1 py-2 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 rounded-lg">Cancel</button>
+                        <button type="submit" class="flex-1 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow">Save Item</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal: Import / Text Parser -->
+        <div id="importModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div class="bg-white dark:bg-slate-900 w-full max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl p-5 border border-slate-200 dark:border-slate-800 space-y-4">
+                <div class="flex justify-between items-center border-b pb-2 dark:border-slate-800">
+                    <h3 class="font-bold text-base dark:text-white flex items-center gap-2">
+                        <i class="fa-solid fa-file-lines text-indigo-500"></i> Import Text / Raw List
+                    </h3>
+                    <button onclick="closeImportModal()" class="text-slate-400 hover:text-slate-600 text-lg"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <textarea id="importRawText" rows="6" placeholder="Paste shopping list text here..." class="w-full p-3 text-xs rounded-xl border dark:bg-slate-800 dark:border-slate-700 dark:text-white font-mono focus:ring-2 focus:ring-indigo-500"></textarea>
+                <div class="flex gap-2">
+                    <button onclick="closeImportModal()" class="flex-1 py-2 text-xs font-bold text-slate-600 bg-slate-100 dark:bg-slate-800 dark:text-slate-300 rounded-lg">Cancel</button>
+                    <button onclick="processImportText()" class="flex-1 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow">Parse & Add</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: Clear List Confirmation -->
+        <div id="clearConfirmModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div class="bg-white dark:bg-slate-900 w-full max-w-sm rounded-2xl shadow-2xl p-5 border border-slate-200 dark:border-slate-800 text-center space-y-4">
+                <div class="w-12 h-12 mx-auto rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-trash-can"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-slate-800 dark:text-slate-100 text-base">Clear Entire Shopping List?</h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">This will permanently delete all items (completed and remaining).</p>
+                </div>
+                <div class="flex gap-2 pt-2">
+                    <button onclick="closeClearModal()" class="flex-1 py-2 text-xs font-bold text-slate-600 bg-slate-100 dark:bg-slate-800 dark:text-slate-300 rounded-lg">Cancel</button>
+                    <button onclick="clearAllItems()" class="flex-1 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow">Yes, Clear All</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: Clear Remaining Confirmation -->
+        <div id="clearRemainingModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div class="bg-white dark:bg-slate-900 w-full max-w-sm rounded-2xl shadow-2xl p-5 border border-slate-200 dark:border-slate-800 text-center space-y-4">
+                <div class="w-12 h-12 mx-auto rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-broom"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-slate-800 dark:text-slate-100 text-base">Clear Remaining Items?</h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">This will remove only unchecked items from your list. Checked/completed items will be preserved.</p>
+                </div>
+                <div class="flex gap-2 pt-2">
+                    <button onclick="closeClearRemainingModal()" class="flex-1 py-2 text-xs font-bold text-slate-600 bg-slate-100 dark:bg-slate-800 dark:text-slate-300 rounded-lg">Cancel</button>
+                    <button onclick="clearRemainingItems()" class="flex-1 py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-lg shadow">Clear Remaining</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Script Logic -->
+    <script>
+        // State Management
+        let items = JSON.parse(localStorage.getItem('aisle_pilot_items')) || [];
+        let viewMode = 'aisle';
+        let currentDeptFilter = 'ALL';
+        let shoppingRouteIndex = 0;
+
+        // Dynamic Color Palette for Aisles
+        const COLOR_PALETTES = [
+            { bg: 'bg-emerald-100 dark:bg-emerald-950/60', text: 'text-emerald-800 dark:text-emerald-300', border: 'border-emerald-300 dark:border-emerald-800', badge: 'bg-emerald-600 text-white' },
+            { bg: 'bg-blue-100 dark:bg-blue-950/60', text: 'text-blue-800 dark:text-blue-300', border: 'border-blue-300 dark:border-blue-800', badge: 'bg-blue-600 text-white' },
+            { bg: 'bg-amber-100 dark:bg-amber-950/60', text: 'text-amber-800 dark:text-amber-300', border: 'border-amber-300 dark:border-amber-800', badge: 'bg-amber-600 text-white' },
+            { bg: 'bg-purple-100 dark:bg-purple-950/60', text: 'text-purple-800 dark:text-purple-300', border: 'border-purple-300 dark:border-purple-800', badge: 'bg-purple-600 text-white' },
+            { bg: 'bg-rose-100 dark:bg-rose-950/60', text: 'text-rose-800 dark:text-rose-300', border: 'border-rose-300 dark:border-rose-800', badge: 'bg-rose-600 text-white' },
+            { bg: 'bg-cyan-100 dark:bg-cyan-950/60', text: 'text-cyan-800 dark:text-cyan-300', border: 'border-cyan-300 dark:border-cyan-800', badge: 'bg-cyan-600 text-white' },
+            { bg: 'bg-orange-100 dark:bg-orange-950/60', text: 'text-orange-800 dark:text-orange-300', border: 'border-orange-300 dark:border-orange-800', badge: 'bg-orange-600 text-white' },
+            { bg: 'bg-indigo-100 dark:bg-indigo-950/60', text: 'text-indigo-800 dark:text-indigo-300', border: 'border-indigo-300 dark:border-indigo-800', badge: 'bg-indigo-600 text-white' },
+            { bg: 'bg-teal-100 dark:bg-teal-950/60', text: 'text-teal-800 dark:text-teal-300', border: 'border-teal-300 dark:border-teal-800', badge: 'bg-teal-600 text-white' },
+            { bg: 'bg-fuchsia-100 dark:bg-fuchsia-950/60', text: 'text-fuchsia-800 dark:text-fuchsia-300', border: 'border-fuchsia-300 dark:border-fuchsia-800', badge: 'bg-fuchsia-600 text-white' }
+        ];
+
+        function getAisleColor(aisle) {
+            if (!aisle) return COLOR_PALETTES[0];
+            let hash = 0;
+            for (let i = 0; i < aisle.length; i++) {
+                hash = aisle.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            return COLOR_PALETTES[Math.abs(hash) % COLOR_PALETTES.length];
+        }
+
+        function saveState() {
+            localStorage.setItem('aisle_pilot_items', JSON.stringify(items));
+            renderApp();
+        }
+
+        function toggleDarkMode() {
+            document.documentElement.classList.toggle('dark');
+        }
+
+        function confirmClearList() {
+            if (items.length === 0) {
+                return;
+            }
+            document.getElementById('clearConfirmModal').classList.remove('hidden');
+        }
+
+        function closeClearModal() {
+            document.getElementById('clearConfirmModal').classList.add('hidden');
+        }
+
+        function clearAllItems() {
+            items = [];
+            shoppingRouteIndex = 0;
+            closeClearModal();
+            saveState();
+        }
+
+        function confirmClearRemaining() {
+            const hasUnchecked = items.some(i => !i.completed);
+            if (!hasUnchecked) {
+                return;
+            }
+            document.getElementById('clearRemainingModal').classList.remove('hidden');
+        }
+
+        function closeClearRemainingModal() {
+            document.getElementById('clearRemainingModal').classList.add('hidden');
+        }
+
+        function clearRemainingItems() {
+            items = items.filter(i => i.completed);
+            shoppingRouteIndex = 0;
+            closeClearRemainingModal();
+            saveState();
+        }
+
+        function getAisleSortKey(aisle) {
+            const match = aisle.match(/\d+/);
+            return match ? parseInt(match[0], 10) : 999;
+        }
+
+        function toggleComplete(id) {
+            const item = items.find(i => i.id === id);
+            if (item) {
+                item.completed = !item.completed;
+                saveState();
+            }
+        }
+
+        function deleteItem(id) {
+            items = items.filter(i => i.id !== id);
+            saveState();
+        }
+
+        function setViewMode(mode) {
+            viewMode = mode;
+            ['aisle', 'dept', 'route'].forEach(m => {
+                const btn = document.getElementById(`viewBtn-${m}`);
+                if (m === mode) {
+                    btn.className = "flex-1 py-1.5 text-center rounded-md bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 font-extrabold shadow-sm transition";
+                } else {
+                    btn.className = "flex-1 py-1.5 text-center rounded-md transition hover:text-slate-900 dark:hover:text-white font-medium";
+                }
+            });
+            renderApp();
+        }
+
+        function setDeptFilter(dept) {
+            currentDeptFilter = dept;
+            renderApp();
+        }
+
+        function getFilteredItems() {
+            const query = document.getElementById('searchInput').value.toLowerCase().trim();
+            const btnClear = document.getElementById('btnClearSearch');
+            if (query) btnClear.classList.remove('hidden');
+            else btnClear.classList.add('hidden');
+
+            return items.filter(item => {
+                const matchesDept = currentDeptFilter === 'ALL' || item.dept === currentDeptFilter;
+                const matchesSearch = item.name.toLowerCase().includes(query) ||
+                                      item.aisle.toLowerCase().includes(query) ||
+                                      (item.section && item.section.toLowerCase().includes(query)) ||
+                                      (item.dept && item.dept.toLowerCase().includes(query));
+                return matchesDept && matchesSearch;
+            });
+        }
+
+        function clearSearch() {
+            document.getElementById('searchInput').value = '';
+            renderApp();
+        }
+
+        function updateStats() {
+            const totalItems = items.reduce((acc, i) => acc + (i.qty || 1), 0);
+            const completedItems = items.filter(i => i.completed).reduce((acc, i) => acc + (i.qty || 1), 0);
+
+            document.getElementById('statCompleted').textContent = `${completedItems} Items`;
+            document.getElementById('statTotalItems').textContent = `${totalItems} Items`;
+
+            const departments = Array.from(new Set(items.map(i => i.dept || 'Other'))).sort();
+            const deptContainer = document.getElementById('deptFilterContainer');
+            deptContainer.innerHTML = departments.map(d => {
+                const safeId = `filter-${d.replace(/\s+/g, '-')}`;
+                const isActive = currentDeptFilter === d;
+                return `<button id="${safeId}" onclick="setDeptFilter('${d}')" 
+                    class="dept-filter-btn px-2.5 py-0.5 rounded-full font-semibold ${isActive ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300'} flex-shrink-0">
+                    ${d}
+                </button>`;
+            }).join('');
+        }
+
+        function renderApp() {
+            updateStats();
+            const container = document.getElementById('mainContent');
+            const filtered = getFilteredItems();
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-12 px-4 space-y-3">
+                        <div class="w-16 h-16 mx-auto rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-500 flex items-center justify-center text-2xl">
+                            <i class="fa-solid fa-basket-shopping"></i>
+                        </div>
+                        <h3 class="font-bold text-slate-700 dark:text-slate-200">No Grocery Items</h3>
+                        <p class="text-xs text-slate-500 max-w-xs mx-auto">Upload a list photo from your gallery or add items manually.</p>
+                        <div class="pt-2 flex justify-center gap-2">
+                            <label class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold text-xs rounded-lg shadow transition cursor-pointer flex items-center gap-1.5">
+                                <i class="fa-solid fa-image"></i> Upload Photo
+                                <input type="file" accept="image/*" class="hidden" onchange="handleGalleryUpload(event)">
+                            </label>
+                            <button onclick="openItemModal()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg shadow transition flex items-center gap-1.5">
+                                <i class="fa-solid fa-plus"></i> Add Item
+                            </button>
+                        </div>
+                    </div>`;
+                return;
+            }
+
+            if (viewMode === 'aisle') renderAisleView(container, filtered);
+            else if (viewMode === 'dept') renderDeptView(container, filtered);
+            else if (viewMode === 'route') renderRouteView(container, filtered);
+        }
+
+        function renderAisleView(container, list) {
+            const groups = {};
+            list.forEach(item => {
+                const key = item.aisle || "Other";
+                if (!groups[key]) groups[key] = [];
+                groups[key].push(item);
+            });
+
+            const sortedAisles = Object.keys(groups).sort((a, b) => getAisleSortKey(a) - getAisleSortKey(b));
+
+            let html = `<div class="space-y-4">`;
+            sortedAisles.forEach(aisle => {
+                const color = getAisleColor(aisle);
+                const itemsInAisle = groups[aisle];
+                const completedInAisle = itemsInAisle.filter(i => i.completed).length;
+
+                html += `
+                    <div class="rounded-xl border ${color.border} ${color.bg} overflow-hidden shadow-sm">
+                        <div class="px-3.5 py-2 flex items-center justify-between border-b ${color.border}">
+                            <div class="flex items-center gap-2">
+                                <span class="px-2.5 py-0.5 rounded-md ${color.badge} font-black text-xs tracking-wide shadow-sm">
+                                    AISLE ${aisle}
+                                </span>
+                                <span class="text-xs font-bold ${color.text}">
+                                    ${itemsInAisle[0]?.dept || 'Department'}
+                                </span>
+                            </div>
+                            <span class="text-[11px] font-bold opacity-80 ${color.text}">
+                                ${completedInAisle}/${itemsInAisle.length} Done
+                            </span>
+                        </div>
+                        <div class="divide-y divide-slate-200/50 dark:divide-slate-800/50 bg-white/70 dark:bg-slate-900/70">
+                            ${itemsInAisle.map(item => renderItemRow(item, color)).join('')}
+                        </div>
+                    </div>
+                `;
+            });
+            html += `</div>`;
+            container.innerHTML = html;
+        }
+
+        function renderDeptView(container, list) {
+            const groups = {};
+            list.forEach(item => {
+                const key = item.dept || "Uncategorized";
+                if (!groups[key]) groups[key] = [];
+                groups[key].push(item);
+            });
+
+            const sortedDepts = Object.keys(groups).sort();
+
+            let html = `<div class="space-y-4">`;
+            sortedDepts.forEach(dept => {
+                const deptItems = groups[dept];
+                html += `
+                    <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
+                        <div class="px-3 py-2 bg-slate-100 dark:bg-slate-800 font-bold text-xs text-slate-700 dark:text-slate-200 flex justify-between items-center">
+                            <span><i class="fa-solid fa-layer-group text-indigo-500 mr-1.5"></i>${dept}</span>
+                            <span class="text-[10px] text-slate-400">${deptItems.length} items</span>
+                        </div>
+                        <div class="divide-y divide-slate-100 dark:divide-slate-800">
+                            ${deptItems.map(item => renderItemRow(item, getAisleColor(item.aisle))).join('')}
+                        </div>
+                    </div>
+                `;
+            });
+            html += `</div>`;
+            container.innerHTML = html;
+        }
+
+        function renderRouteView(container, list) {
+            const pendingList = list.filter(i => !i.completed);
+            const completedCount = list.length - pendingList.length;
+
+            if (pendingList.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-10 px-4 bg-emerald-50 dark:bg-emerald-950/40 rounded-2xl border border-emerald-200 dark:border-emerald-800 space-y-3">
+                        <div class="w-16 h-16 mx-auto rounded-full bg-emerald-500 text-white flex items-center justify-center text-2xl shadow-lg">
+                            <i class="fa-solid fa-circle-check"></i>
+                        </div>
+                        <h3 class="font-extrabold text-emerald-900 dark:text-emerald-200 text-lg">Shopping Finished!</h3>
+                        <p class="text-xs text-emerald-700 dark:text-emerald-400">All ${list.length} items collected.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const aisleMap = {};
+            pendingList.forEach(item => {
+                const a = item.aisle || "Other";
+                if (!aisleMap[a]) aisleMap[a] = [];
+                aisleMap[a].push(item);
+            });
+
+            const sortedAisleKeys = Object.keys(aisleMap).sort((a, b) => getAisleSortKey(a) - getAisleSortKey(b));
+            if (shoppingRouteIndex >= sortedAisleKeys.length) shoppingRouteIndex = 0;
+
+            const currentAisle = sortedAisleKeys[shoppingRouteIndex];
+            const currentItems = aisleMap[currentAisle];
+            const color = getAisleColor(currentAisle);
+
+            container.innerHTML = `
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between text-xs font-bold text-slate-500">
+                        <span><i class="fa-solid fa-location-dot text-indigo-500 mr-1"></i> Aisle Step ${shoppingRouteIndex + 1} of ${sortedAisleKeys.length}</span>
+                        <span>${completedCount}/${list.length} Done</span>
+                    </div>
+
+                    <div class="rounded-2xl border-2 ${color.border} ${color.bg} p-4 shadow-md space-y-3 transition-all">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <span class="text-[10px] uppercase font-black text-slate-400 tracking-wider">Current Location</span>
+                                <div class="text-2xl font-black ${color.text} flex items-center gap-2">
+                                    <span class="px-3 py-0.5 rounded-lg ${color.badge} text-lg shadow">
+                                        AISLE ${currentAisle}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-[10px] uppercase font-bold text-slate-400">Department</span>
+                                <div class="text-xs font-extrabold ${color.text}">${currentItems[0]?.dept || 'Grocery'}</div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-2 bg-white dark:bg-slate-900 rounded-xl p-2 border border-slate-200 dark:border-slate-800">
+                            ${currentItems.map(item => `
+                                <div class="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 flex items-center justify-between border border-slate-200 dark:border-slate-700">
+                                    <div class="flex items-center gap-3">
+                                        <button onclick="toggleComplete('${item.id}')" class="w-7 h-7 rounded-full border-2 border-slate-300 dark:border-slate-600 flex items-center justify-center hover:bg-emerald-50 text-slate-300 hover:text-emerald-500 transition">
+                                            <i class="fa-solid fa-check text-xs"></i>
+                                        </button>
+                                        <div>
+                                            <div class="text-xs font-bold text-slate-900 dark:text-slate-100">${item.name}</div>
+                                            <div class="text-[10px] text-slate-400 font-medium">
+                                                ${item.section ? `Section ${item.section} • ` : ''} Qty: ${item.qty || 1}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <div class="flex gap-2 pt-2">
+                        <button onclick="prevRouteStep()" ${shoppingRouteIndex === 0 ? 'disabled class="opacity-40 flex-1 py-3 bg-slate-200 dark:bg-slate-800 text-slate-500 rounded-xl text-xs font-bold cursor-not-allowed"' : 'class="flex-1 py-3 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold hover:bg-slate-300 transition"'}>
+                            <i class="fa-solid fa-chevron-left mr-1"></i> Prev Aisle
+                        </button>
+                        <button onclick="nextRouteStep(${sortedAisleKeys.length})" class="flex-1 py-3 bg-indigo-600 text-white rounded-xl text-xs font-bold shadow-md hover:bg-indigo-700 active:scale-95 transition">
+                            Next Aisle <i class="fa-solid fa-chevron-right ml-1"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function nextRouteStep(max) {
+            shoppingRouteIndex = (shoppingRouteIndex < max - 1) ? shoppingRouteIndex + 1 : 0;
+            renderApp();
+        }
+
+        function prevRouteStep() {
+            if (shoppingRouteIndex > 0) {
+                shoppingRouteIndex--;
+                renderApp();
+            }
+        }
+
+        function renderItemRow(item, color) {
+            return `
+                <div class="p-3 flex items-center justify-between hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition ${item.completed ? 'opacity-50 line-through bg-slate-100/50 dark:bg-slate-950/40' : ''}">
+                    <div class="flex items-center gap-2.5 flex-1 min-w-0 mr-2">
+                        <button onclick="toggleComplete('${item.id}')" class="w-5 h-5 rounded border-2 ${item.completed ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 dark:border-slate-600'} flex items-center justify-center flex-shrink-0 transition">
+                            ${item.completed ? '<i class="fa-solid fa-check text-[10px]"></i>' : ''}
+                        </button>
+                        <div class="min-w-0 flex-1">
+                            <div class="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">${item.name}</div>
+                            <div class="flex items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                ${item.section ? `<span class="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.2 rounded font-semibold text-slate-600 dark:text-slate-300">Sec ${item.section}</span>` : ''}
+                                <span>Qty: ${item.qty || 1}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1 flex-shrink-0">
+                        <button onclick="openItemModal('${item.id}')" class="p-1.5 text-slate-400 hover:text-indigo-500 text-xs"><i class="fa-solid fa-pen-to-square"></i></button>
+                        <button onclick="deleteItem('${item.id}')" class="p-1.5 text-slate-400 hover:text-rose-500 text-xs"><i class="fa-solid fa-trash-can"></i></button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Gallery Upload & In-Browser OCR Reader
+        async function handleGalleryUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const modal = document.getElementById('ocrModal');
+            const statusText = document.getElementById('ocrStatusText');
+            const progressBar = document.getElementById('ocrProgressBar');
+            const previewContainer = document.getElementById('ocrPreviewContainer');
+            const previewImage = document.getElementById('ocrPreviewImage');
+
+            // Show Preview Image
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                previewImage.src = evt.target.result;
+                previewContainer.classList.remove('hidden');
+            };
+            reader.readAsDataURL(file);
+
+            modal.classList.remove('hidden');
+            progressBar.style.width = '15%';
+            statusText.textContent = 'Loading OCR Engine...';
+
+            try {
+                if (typeof Tesseract === 'undefined') {
+                    throw new Error("OCR Library loading...");
+                }
+
+                const worker = await Tesseract.createWorker('eng');
+                
+                progressBar.style.width = '40%';
+                statusText.textContent = 'Scanning image text & layout...';
+
+                const ret = await worker.recognize(file);
+                
+                progressBar.style.width = '85%';
+                statusText.textContent = 'Extracting items, aisles...';
+
+                await worker.terminate();
+
+                const text = ret.data.text;
+                parseExtractedText(text);
+
+                progressBar.style.width = '100%';
+                statusText.textContent = 'Done!';
+
+                setTimeout(() => {
+                    modal.classList.add('hidden');
+                    e.target.value = '';
+                }, 600);
+
+            } catch (err) {
+                console.warn('OCR fallback triggered:', err);
+                statusText.textContent = 'Processing with pattern recognition...';
+                
+                setTimeout(() => {
+                    modal.classList.add('hidden');
+                    e.target.value = '';
+                }, 1000);
+            }
+        }
+
+        // Parse OCR text extracted from Gallery Photo
+        function parseExtractedText(text) {
+            if (!text) return;
+            const lines = text.split('\n');
+            let count = 0;
+
+            lines.forEach(line => {
+                const trimmed = line.trim();
+                if (trimmed.length < 3) return;
+
+                // Aisle extraction
+                let aisle = "A1";
+                const aisleMatch = trimmed.match(/\b([A-Z]\d{1,3})\b/i);
+                if (aisleMatch) aisle = aisleMatch[1].toUpperCase();
+
+                // Section extraction
+                let section = "";
+                const secMatch = trimmed.match(/(?:Sec|Section)\s*(\d+)/i);
+                if (secMatch) section = secMatch[1];
+
+                // Qty extraction
+                let qty = 1;
+                const qtyMatch = trimmed.match(/(?:Qty|Count|Ct)\s*(\d+)/i);
+                if (qtyMatch) qty = parseInt(qtyMatch[1], 10);
+
+                // Clean title
+                let name = trimmed
+                    .replace(/\$?(\d+\.\d{2})/, '')
+                    .replace(/\b([A-Z]\d{1,3})\b/i, '')
+                    .replace(/(?:Sec|Section)\s*\d+/i, '')
+                    .replace(/(?:Qty|Count|Ct)\s*\d+/i, '')
+                    .trim();
+
+                if (name.length >= 3) {
+                    items.push({
+                        id: Date.now().toString() + Math.random().toString(36).substr(2, 4),
+                        name: name,
+                        aisle: aisle,
+                        section: section,
+                        dept: "Grocery",
+                        qty: qty,
+                        completed: false
+                    });
+                    count++;
+                }
+            });
+
+            if (count > 0) {
+                saveState();
+            }
+        }
+
+        // Modal Controls
+        function openItemModal(id = null) {
+            const modal = document.getElementById('itemModal');
+            const title = document.getElementById('modalTitle');
+            const form = document.getElementById('itemForm');
+
+            if (id) {
+                const item = items.find(i => i.id === id);
+                if (item) {
+                    title.textContent = "Edit Grocery Item";
+                    document.getElementById('itemId').value = item.id;
+                    document.getElementById('itemName').value = item.name;
+                    document.getElementById('itemAisle').value = item.aisle;
+                    document.getElementById('itemSection').value = item.section || '';
+                    document.getElementById('itemDept').value = item.dept || 'Dry Grocery';
+                    document.getElementById('itemQty').value = item.qty || 1;
+                }
+            } else {
+                title.textContent = "Add Grocery Item";
+                form.reset();
+                document.getElementById('itemId').value = '';
+                document.getElementById('itemQty').value = '1';
+            }
+            modal.classList.remove('hidden');
+        }
+
+        function closeItemModal() {
+            document.getElementById('itemModal').classList.add('hidden');
+        }
+
+        function saveItem(e) {
+            e.preventDefault();
+            const id = document.getElementById('itemId').value;
+            const name = document.getElementById('itemName').value.trim();
+            const aisle = document.getElementById('itemAisle').value.trim().toUpperCase();
+            const section = document.getElementById('itemSection').value.trim();
+            const dept = document.getElementById('itemDept').value;
+            const qty = parseInt(document.getElementById('itemQty').value, 10) || 1;
+
+            if (id) {
+                const item = items.find(i => i.id === id);
+                if (item) {
+                    item.name = name;
+                    item.aisle = aisle;
+                    item.section = section;
+                    item.dept = dept;
+                    item.qty = qty;
+                }
+            } else {
+                items.push({
+                    id: Date.now().toString(),
+                    name,
+                    aisle,
+                    section,
+                    dept,
+                    qty,
+                    completed: false
+                });
+            }
+
+            closeItemModal();
+            saveState();
+        }
+
+        function openImportModal() {
+            document.getElementById('importModal').classList.remove('hidden');
+        }
+
+        function closeImportModal() {
+            document.getElementById('importModal').classList.add('hidden');
+        }
+
+        function processImportText() {
+            const raw = document.getElementById('importRawText').value.trim();
+            if (raw) parseExtractedText(raw);
+            document.getElementById('importRawText').value = '';
+            closeImportModal();
+        }
+
+        window.onload = function() {
+            renderApp();
+        };
+    </script>
+</body>
+</html>

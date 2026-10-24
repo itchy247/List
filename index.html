@@ -158,54 +158,6 @@
         let currentView = 'aisles';
         let searchQuery = '';
 
-        // Initial default list matching reference sample
-        let items = [
-            {
-                name: "Perdue Harvestland, Organic, Fresh Boneless Chicken...",
-                aisle: "A39",
-                section: "27",
-                price: 6.74,
-                qty: 1,
-                category: "Meat & Poultry",
-                perishable: true,
-                picked: false,
-                image: "https://images.unsplash.com/photo-1604503468506-a8da13d82791?auto=format&fit=crop&w=300&q=80"
-            },
-            {
-                name: "Pork Center Cut Loin Chops Thin Boneless, 14 Count,...",
-                aisle: "A40",
-                section: "1",
-                price: 5.77,
-                qty: 1,
-                category: "Meat & Poultry",
-                perishable: true,
-                picked: false,
-                image: "https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?auto=format&fit=crop&w=300&q=80"
-            },
-            {
-                name: "Marketside Organic Grass-fed Ground Beef 93% Lean/ 7%...",
-                aisle: "A40",
-                section: "9",
-                price: 23.48,
-                qty: 1,
-                category: "Meat & Poultry",
-                perishable: true,
-                picked: false,
-                image: "https://images.unsplash.com/photo-1588168333986-5078d3ae3976?auto=format&fit=crop&w=300&q=80"
-            },
-            {
-                name: "Marketside Organic Fresh Broccoli Florets, 12 Oz",
-                aisle: "A1",
-                section: "13",
-                price: 3.97,
-                qty: 1,
-                category: "Produce",
-                perishable: true,
-                picked: false,
-                image: "https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?auto=format&fit=crop&w=300&q=80"
-            }
-        ];
-
         function showToast(message) {
             const toast = document.getElementById('toast');
             toast.innerText = message;
